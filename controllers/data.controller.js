@@ -1,4 +1,3 @@
-// import puter from "@heyputer/puter.js";
 import { GoogleGenAI } from "@google/genai";
 import { getJson } from "serpapi";
 
