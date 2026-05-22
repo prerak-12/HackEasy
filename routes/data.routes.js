@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { getData } from '../controllers/data.controller.js';
+import { generateData } from '../controllers/data.controller.js';
 const router = Router();
 
-router.post("/data", generateData);
+router.post("/generateData", generateData);
 
 export default router;

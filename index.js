@@ -1,6 +1,15 @@
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
 import dataRoutes from "./routes/data.routes.js";
+
+import fetch, { Headers } from 'node-fetch';
+if (!globalThis.fetch) {
+    globalThis.fetch = fetch;
+    globalThis.Headers = Headers;
+}
+
+dotenv.config({ path: ".env.local" });
 
 const app = express();
 
@@ -14,6 +23,8 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
