@@ -23,11 +23,9 @@ Data to analyze: ${description}`;
         contents: prompt,
     });
     
-    // The SDK wraps the text inside a response object helper
     return response?.text || null;
 }
 
-// Helper function to turn SerpApi callback into a Promise
 const fetchYoutubeData = (videoId) => {
     return new Promise((resolve, reject) => {
         getJson({
@@ -72,8 +70,10 @@ export const generateData = async (req, res) => {
             .trim();                     // Trims trailing whitespace
             
         const parsedAiData = JSON.parse(cleanedString);
+
+        const deepLink = "";
         
-        return res.status(200).json({ success: true, data: data, aiData: parsedAiData });
+        return res.status(200).json({ success: true, data: data, aiData: parsedAiData, deepLink: deepLink });
 
     } catch (error) {
         console.error("Error details:", error);
