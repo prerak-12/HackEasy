@@ -47,33 +47,40 @@ export const generateData = async (req, res) => {
         const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
         const { youtubeQuery } = req.body;
-        if (!youtubeQuery) {
-            return res.status(400).json({ success: false, error: "Query parameter is required" });
+        if (!Array.isArray(youtubeQuery) || youtubeQuery.length === 0) {
+            return res.status(400).json({ success: false, error: "youtubeQuery must be a non-empty array" });
         }
 
         console.log("Fetching data from SerpApi...");
-        const data = await fetchYoutubeData(youtubeQuery);
-        
-        const description = data?.description?.content || "";
-        let generatedData = null;
+        const results = await Promise.all(
+            youtubeQuery.map(async (videoId) => {
+                const data = await fetchYoutubeData(videoId);
+                const description = data?.description?.content || "";
 
-        if (description && description.trim() !== "") {
-            console.log("Generating AI Data...");
-            generatedData = await generateAIData(ai, description);
-        } else {
-            console.log("No description found to analyze.");
-        }
+                let parsedAiData = null;
+                if (description && description.trim() !== "") {
+                    console.log("Generating AI Data...");
+                    const generatedData = await generateAIData(ai, description);
+                    if (generatedData) {
+                        const cleanedString = generatedData
+                            .replace(/^```json\s*/i, "") // Removes starting ```json
+                            .replace(/```\s*$/, "")      // Removes ending ```
+                            .trim();                     // Trims trailing whitespace
+                        try {
+                            parsedAiData = JSON.parse(cleanedString);
+                        } catch {
+                            parsedAiData = null;
+                        }
+                    }
+                } else {
+                    console.log("No description found to analyze.");
+                }
 
-        const cleanedString = generatedData
-            .replace(/^```json\s*/i, "") // Removes starting ```json
-            .replace(/```\s*$/, "")      // Removes ending ```
-            .trim();                     // Trims trailing whitespace
-            
-        const parsedAiData = JSON.parse(cleanedString);
+                return { data, aiData: parsedAiData, deepLink: "" };
+            })
+        );
 
-        const deepLink = "";
-        
-        return res.status(200).json({ success: true, data: data, aiData: parsedAiData, deepLink: deepLink });
+        return res.status(200).json({ success: true, results });
 
     } catch (error) {
         console.error("Error details:", error);
