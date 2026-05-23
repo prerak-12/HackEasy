@@ -101,7 +101,6 @@ export const generateData = async (req, res) => {
                 let parsedAiData = null;
                 let deepLink = null;
                 let isAiUsed = false;
-                let finalizedData = null;
 
                 if (useAi && description && description.trim() !== "") {
                     const generatedData = await generateAIData(ai, description);
@@ -130,18 +129,17 @@ export const generateData = async (req, res) => {
                     };
                     isAiUsed = false;
                     deepLink = handleDeepLink(parsedAiData.categories.category);
-
-                    finalizedData = {
-                        title: data?.title,
-                        description: parsedAiData?.categories?.description,
-                        ctaText: parsedAiData?.categories?.cta_text,
-                        thumbnail: data?.thumbnail || null,
-                        ai_used: isAiUsed,
-                        deepLink: deepLink,
-                        category: parsedAiData?.categories?.category,
-
-                    }
                 }
+
+                const finalizedData = {
+                    title: data?.title,
+                    description: parsedAiData?.categories?.description,
+                    ctaText: parsedAiData?.categories?.cta_text,
+                    thumbnail: data?.thumbnail || null,
+                    ai_used: isAiUsed,
+                    deepLink: deepLink,
+                    category: parsedAiData?.categories?.category,
+                };
 
                 return { data: finalizedData };
             })
