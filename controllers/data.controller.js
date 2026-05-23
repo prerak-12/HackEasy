@@ -88,7 +88,7 @@ export const generateData = async (req, res) => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
-        const { youtubeQuery, useAi } = req.body;
+        const { youtubeQuery, useAi = true } = req.body;
         if (!Array.isArray(youtubeQuery) || youtubeQuery.length === 0) {
             return res.status(400).json({ success: false, error: "youtubeQuery must be a non-empty array" });
         }
