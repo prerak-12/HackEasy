@@ -141,7 +141,7 @@ export const generateData = async (req, res) => {
                     category: parsedAiData?.categories?.category,
                 };
 
-                return { data: finalizedData };
+                return finalizedData;
             })
         );
 
