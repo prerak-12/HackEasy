@@ -1,5 +1,25 @@
 import { GoogleGenAI } from "@google/genai";
 import { getJson } from "serpapi";
+import dummyDataById from "../constants/dummyLinks.js";
+
+const getFallbackData = (videoId) => {
+    const dummy = dummyDataById[videoId];
+    if (dummy) {
+        return {
+            search_parameters: { engine: "youtube_video", v: videoId },
+            title: dummy.title,
+            thumbnail: dummy.thumbnail,
+            description: dummy.description,
+        };
+    }
+
+    return {
+        search_parameters: { engine: "youtube_video", v: videoId },
+        title: "PharmEasy Video",
+        thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+        description: { content: "PharmEasy content." },
+    };
+};
 
 const handleDeepLink = (category) => {
     switch (category) {
@@ -68,6 +88,11 @@ const generateAIData = async (ai, description) => {
     return response?.text || null;
 }
 
+const isQuotaError = (error) => {
+    const message = error?.message || "";
+    return message.includes("RESOURCE_EXHAUSTED") || message.includes("Quota exceeded") || message.includes("\"code\":429");
+};
+
 const fetchYoutubeData = (videoId) => {
     return new Promise((resolve, reject) => {
         getJson({
@@ -86,40 +111,74 @@ const fetchYoutubeData = (videoId) => {
 
 export const generateData = async (req, res) => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+        let ai = null;
+        try {
+            ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+        } catch (initError) {
+            console.error("Failed to initialize GoogleGenAI:", initError);
+            ai = null;
+        }
 
         const { youtubeQuery, useAi = true } = req.body;
-        if (!Array.isArray(youtubeQuery) || youtubeQuery.length === 0) {
-            return res.status(400).json({ success: false, error: "youtubeQuery must be a non-empty array" });
+        const ids = Array.isArray(youtubeQuery)
+            ? youtubeQuery
+            : youtubeQuery
+                ? [youtubeQuery]
+                : [];
+
+        if (ids.length === 0) {
+            return res.status(400).json({ success: false, error: "youtubeQuery must be a non-empty array or string" });
         }
 
         const results = await Promise.all(
-            youtubeQuery.map(async (videoId) => {
-                const data = await fetchYoutubeData(videoId);
+            ids.map(async (videoId) => {
+                let data = null;
+                try {
+                    data = await fetchYoutubeData(videoId);
+                } catch {
+                    data = getFallbackData(videoId);
+                }
+
+                if (!data) {
+                    data = getFallbackData(videoId);
+                }
                 const description = data?.description?.content || null;
 
                 let parsedAiData = null;
                 let deepLink = null;
                 let isAiUsed = false;
 
-                if (useAi && description && description.trim() !== "") {
-                    const generatedData = await generateAIData(ai, description);
-                    if (generatedData) {
-                        const cleanedString = generatedData
-                            .replace(/^```json\s*/i, "")
-                            .replace(/```\s*$/, "")    
-                            .trim();
-                        try {
-                            parsedAiData = JSON.parse(cleanedString);
-                            deepLink = handleDeepLink(parsedAiData.categories.category);
-                            isAiUsed = true;
-                        } catch {
-                            parsedAiData = null;
-                            deepLink = null;
-                            isAiUsed = false;
+                if (useAi && ai && description && description.trim() !== "") {
+                    try {
+                        const generatedData = await generateAIData(ai, description);
+                        if (generatedData) {
+                            const cleanedString = generatedData
+                                .replace(/^```json\s*/i, "")
+                                .replace(/```\s*$/, "")    
+                                .trim();
+                            try {
+                                parsedAiData = JSON.parse(cleanedString);
+                                deepLink = handleDeepLink(parsedAiData.categories.category);
+                                isAiUsed = true;
+                            } catch (parseErr) {
+                                console.error("Failed to parse AI response for", videoId, parseErr);
+                                parsedAiData = null;
+                                deepLink = null;
+                                isAiUsed = false;
+                            }
                         }
+                    } catch (error) {
+                        console.error("AI error for", videoId, error);
+                        // Always fallback on any AI error (quota or otherwise) so the
+                        // overall batch doesn't fail. We'll set parsedAiData to null
+                        // and continue to construct the fallback finalizedData below.
+                        parsedAiData = null;
+                        deepLink = null;
+                        isAiUsed = false;
                     }
-                } else {
+                }
+
+                if (!parsedAiData) {
                     parsedAiData = {
                         categories: {
                             category: "MEDICINES",
